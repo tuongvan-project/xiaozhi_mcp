@@ -153,14 +153,59 @@ def _fetch_ddg_web_vn(query: str, max_items: int = 4) -> list[str]:
         return []
 
 
+# Cơ sở tri thức chuẩn hóa Địa lý Hành chính 2026, Lịch sử & Phong tục tập quán Việt Nam
+VN_ADMIN_2026_KB: list[tuple[tuple[str, ...], str]] = [
+    (
+        ("sap nhap tinh", "34 tinh", "bo cap huyen", "don vi hanh chinh", "bao nhieu tinh", "chinh quyen 2 cap", "cap huyen"),
+        "Cập nhật Địa lý Hành chính Việt Nam mới nhất (theo Nghị quyết 60-NQ/TW và Nghị quyết 202/2025/QH15, áp dụng xuyên suốt năm 2026): "
+        "1. Việt Nam chính thức bỏ hoàn toàn cấp huyện (không còn quận, huyện, thị xã, thành phố thuộc tỉnh), vận hành mô hình chính quyền địa phương 2 cấp gồm Cấp Tỉnh và Cấp Xã (Xã, Phường, Đặc khu). "
+        "2. Cả nước sáp nhập từ 63 xuống còn 34 đơn vị hành chính cấp tỉnh (gồm 28 tỉnh và 6 thành phố trực thuộc Trung ương). "
+        "3. 11 tỉnh thành giữ nguyên: Hà Nội, Huế, Lai Châu, Điện Biên, Sơn La, Lạng Sơn, Quảng Ninh, Thanh Hóa, Nghệ An, Hà Tĩnh, Cao Bằng. "
+        "4. 23 tỉnh thành hợp nhất mới: Tuyên Quang (Tuyên Quang + Hà Giang); Lào Cai (Lào Cai + Yên Bái); Thái Nguyên (Thái Nguyên + Bắc Kạn); Phú Thọ (Phú Thọ + Vĩnh Phúc + Hòa Bình); Bắc Ninh (Bắc Ninh + Bắc Giang); Hưng Yên (Hưng Yên + Thái Bình); Hải Phòng (Hải Phòng + Hải Dương); Ninh Bình (Ninh Bình + Nam Định + Hà Nam); Quảng Trị (Quảng Trị + Quảng Bình); Đà Nẵng (Đà Nẵng + Quảng Nam); Quảng Ngãi (Quảng Ngãi + Kon Tum); Gia Lai (Gia Lai + Bình Định); Khánh Hòa (Khánh Hòa + Ninh Thuận); Lâm Đồng (Lâm Đồng + Bình Thuận + Đắk Nông); Đắk Lắk (Đắk Lắk + Phú Yên); TP. Hồ Chí Minh (TP.HCM + Bình Dương + Bà Rịa - Vũng Tàu); Đồng Nai (Đồng Nai + Bình Phước); Tây Ninh (Tây Ninh + Long An); Cần Thơ (Cần Thơ + Sóc Trăng + Hậu Giang); Vĩnh Long (Vĩnh Long + Bến Tre + Trà Vinh); Đồng Tháp (Đồng Tháp + Tiền Giang); Cà Mau (Cà Mau + Bạc Liêu); An Giang (An Giang + Kiên Giang)."
+    ),
+    (
+        ("tuyen quang", "ha giang", "minh xuan", "my lam", "nong tien", "an tuong", "binh thuan", "124 xa", "1684"),
+        "Thông tin chuẩn Tỉnh Tuyên Quang mới (sau khi hợp nhất tỉnh Tuyên Quang và tỉnh Hà Giang, bỏ cấp huyện theo Nghị quyết 202/2025/QH15 và Nghị quyết 1684/NQ-UBTVQH15): "
+        "1. Tên gọi chính thức: Tỉnh Tuyên Quang. Trung tâm chính trị - hành chính đặt tại Tuyên Quang. Tổng diện tích tự nhiên hơn 13.795 km2, quy mô dân số hơn 1,8 triệu người. "
+        "2. Bỏ toàn bộ các huyện/thành phố cũ (như TP. Tuyên Quang, TP. Hà Giang, Yên Sơn, Sơn Dương, Hàm Yên, Chiêm Hóa, Na Hang, Lâm Bình, Vị Xuyên, Bắc Quang, Quang Bình, Hoàng Su Phì, Xín Mần, Quản Bạ, Yên Minh, Đồng Văn, Mèo Vạc). "
+        "3. Toàn tỉnh Tuyên Quang mới có 124 đơn vị hành chính cấp xã trực thuộc tỉnh, bao gồm 07 phường và 117 xã: "
+        "- 07 phường mới gồm: Phường Minh Xuân (hợp nhất Ỷ La, Tân Hà, Phan Thiết, Minh Xuân, Tân Quang, Trung Môn và một phần Kim Phú); Phường Mỹ Lâm (Mỹ Lâm + Mỹ Bằng + một phần Kim Phú); Phường Nông Tiến (Nông Tiến + Tràng Đà + một phần Thái Bình); Phường An Tường (Hưng Thành + An Tường + Lưỡng Vượng + An Khang + Hoàng Khai); Phường Bình Thuận (Đội Cấn + Thái Long); Phường Hà Giang 1 (Nguyễn Trãi + Phương Thiện + Phương Độ + một phần Quang Trung); Phường Hà Giang 2 (Ngọc Hà + Trần Phú + Minh Khai + phần còn lại Quang Trung + Phong Quang). "
+        "- 117 xã mới trải rộng từ vùng Tân Trào, Sơn Dương, Yên Sơn, Hàm Yên, Chiêm Hóa, Na Hang, Lâm Bình lên tới Vị Xuyên, Bắc Quang, Hoàng Su Phì, Quản Bạ, Yên Minh, Đồng Văn, Lũng Cú, Mèo Vạc."
+    ),
+    (
+        ("tan trao", "thu do khang chien", "khu giai phong", "lich su tuyen quang"),
+        "Lịch sử hào hùng của Tuyên Quang: Tuyên Quang là Thủ đô Khu giải phóng trong Cách mạng Tháng Tám năm 1945 (nơi diễn ra Quốc dân Đại hội Tân Trào ngày 16-17/8/1945 thông qua Lệnh Tổng khởi nghĩa và 10 chính sách lớn của Việt Minh) và là Thủ đô Kháng chiến trong suốt 9 năm kháng chiến chống thực dân Pháp, nơi Chủ tịch Hồ Chí Minh, Trung ương Đảng, Quốc hội, Chính phủ và hầu hết các bộ, ngành ở và làm việc. Sau khi hợp nhất với Hà Giang, tỉnh Tuyên Quang mới còn gắn liền với mặt trận Vị Xuyên kiên cường bảo vệ biên giới phía Bắc Tổ quốc và Cao nguyên đá Đồng Văn - Công viên địa chất toàn cầu UNESCO."
+    ),
+    (
+        ("phong tuc", "tap quan", "le hoi", "van hoa viet nam", "tet nguyen dan", "long tong", "thanh tuyen", "nhay lua", "khau vai"),
+        "Phong tục tập quán và Lễ hội truyền thống Việt Nam & vùng Tuyên Quang: "
+        "1. Phong tục truyền thống dân tộc Việt: Tín ngưỡng thờ cúng tổ tiên, đạo lý Uống nước nhớ nguồn; Tết Nguyên Đán (cúng Ông Công Ông Táo 23 tháng Chạp, gói bánh chưng bánh tét, mâm ngũ quả, cúng Giao thừa, tục xông đất, mừng tuổi đầu năm); Tết Nguyên Tiêu (Rằm tháng Giêng); Giỗ Tổ Hùng Vương (10/3 âm lịch); Tết Đoan Ngọ (5/5 âm lịch); Lễ Vu Lan báo hiếu (Rằm tháng 7); Tết Trung Thu (Rằm tháng 8); tục ăn trầu, mừng thọ ông bà. "
+        "2. Bản sắc văn hóa đặc sắc của tỉnh Tuyên Quang mới (hội tụ 22 dân tộc anh em Tày, Dao, Mông, Pà Thẻn, Cao Lan, Nùng, Lô Lô...): Lễ hội Thành Tuyên (Đêm hội Trung thu có mô hình đèn lồng khổng lồ lớn nhất Việt Nam); Lễ hội Lồng Tồng (Lễ hội xuống đồng cầu mùa đầu xuân của người Tày); Lễ hội Nhảy lửa huyền bí của người Pà Thẻn và người Dao Đỏ; Lễ Cấp sắc của người Dao; Hát Then - Đàn Tính của người Tày (Di sản văn hóa phi vật thể đại diện của nhân loại), Hát Soọng Cô của người Sán Dìu, Hát Sình Ca của người Cao Lan, và Chợ phong lưu Khau Vai."
+    ),
+]
+
+
+def _lookup_vn_curated_kb(query: str) -> str:
+    q_norm = _strip_accents(query)
+    matched: list[str] = []
+    for keywords, content in VN_ADMIN_2026_KB:
+        if any(kw in q_norm for kw in keywords):
+            matched.append(content)
+    return " ".join(matched)
+
+
 def tool_vn_smart_search(query: str, category: str = "general") -> str:
     """
     Siêu công cụ tra cứu thông tin thực tế tại Việt Nam & Thế giới (chạy song song 3 nguồn trong < 2.2s).
-    Hỗ trợ: thời sự, giá vé máy bay, giá hàng hóa, lịch thi đấu, kiến thức khoa học, lịch sử, địa lý, pháp luật.
+    Hỗ trợ: thời sự, giá vé máy bay, giá hàng hóa, lịch thi đấu, kiến thức khoa học, lịch sử,
+    địa lý hành chính mới 2026 (34 tỉnh thành, bỏ cấp huyện, tỉnh Tuyên Quang mới), phong tục tập quán, pháp luật.
     """
     clean_q = " ".join((query or "").strip().split())
     if not clean_q:
         return "Vui lòng cung cấp từ khóa cần tra cứu."
+
+    # Kiểm tra trước trong Kho Tri Thức Chuẩn Hóa Địa Lý Hành Chính 2026, Lịch Sử & Phong Tục
+    curated_hit = _lookup_vn_curated_kb(clean_q)
 
     # Tự động tối ưu từ khóa nếu người dùng hỏi giá vé máy bay hoặc giá cả
     search_q = clean_q
@@ -176,14 +221,15 @@ def tool_vn_smart_search(query: str, category: str = "general") -> str:
     if cached:
         return cached
 
-    # Chỉ gọi Wikipedia khi tra cứu kiến thức (bỏ qua khi hỏi giá vé, giá cả, tin thời sự để tránh nhiễu)
+    # Chỉ gọi Wikipedia khi tra cứu kiến thức chung và KHÔNG trùng với dữ liệu hành chính 2026 (vì Wiki cũ chưa cập nhật hết 34 tỉnh)
     q_lower = clean_q.lower()
     need_wiki = (
-        cat_lower in ("general", "knowledge")
+        not curated_hit
+        and cat_lower in ("general", "knowledge")
         and not any(k in q_lower for k in ("giá vé", "vé máy bay", "giá vàng", "giá xăng", "tỷ giá", "tin tức", "thời sự"))
     )
 
-    # Chạy song song 3 nguồn: Google News VN, Wikipedia VN, và Web Search VN
+    # Chạy song song các nguồn mạng
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         fut_news = pool.submit(_fetch_google_news_vn, search_q, 4)
         fut_wiki = pool.submit(_fetch_wikipedia_vn, clean_q) if need_wiki else None
@@ -207,6 +253,8 @@ def tool_vn_smart_search(query: str, category: str = "general") -> str:
             pass
 
     parts: list[str] = []
+    if curated_hit:
+        parts.append(f"[KIẾN THỨC CHUẨN 2026 - ƯU TIÊN DÙNG]: {curated_hit}")
     if wiki_res:
         parts.append(wiki_res)
     if web_res:
@@ -220,7 +268,7 @@ def tool_vn_smart_search(query: str, category: str = "general") -> str:
             f"Hãy trả lời người nhà dựa trên kiến thức sẵn có một cách ngắn gọn, hữu ích."
         )
 
-    final_text = _clean_for_speech(" . ".join(parts), max_chars=950)
+    final_text = _clean_for_speech(" . ".join(parts), max_chars=1250)
     _cache_set(cache_key, final_text)
     return final_text
 
@@ -956,21 +1004,22 @@ MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
     {
         "name": "vn_smart_search",
         "description": (
-            "Công cụ tra cứu thời gian thực tại Việt Nam và Thế giới (Google News VN, Wikipedia VN, Web VN). "
-            "LUÔN GỌI công cụ này khi người dùng hỏi tin tức thời sự, thể thao, giá vé máy bay (Vietjet, Vietnam Airlines), "
-            "giá xe, điện thoại, lịch sử, địa lý, khoa học, văn bản pháp luật hoặc bất kỳ sự kiện thực tế nào."
+            "Công cụ tra cứu thời gian thực và Cơ sở tri thức chuẩn Việt Nam 2026 (Địa lý hành chính 34 tỉnh thành sau sáp nhập, "
+            "bỏ cấp huyện, tỉnh Tuyên Quang mới hợp nhất với Hà Giang gồm 124 xã phường, Lịch sử Việt Nam, Phong tục tập quán, "
+            "Google News VN, Giá vé máy bay Vietjet/Vietnam Airlines, Giá cả, Pháp luật). "
+            "BẮT BUỘC GỌI công cụ này khi người dùng hỏi về địa lý, tỉnh thành, xã phường, lịch sử, phong tục, tin tức hoặc giá cả."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Từ khóa cần tra cứu bằng tiếng Việt (ví dụ: 'giá vé máy bay Hà Nội Sài Gòn hôm nay', 'tin tức thời sự hôm nay').",
+                    "description": "Từ khóa cần tra cứu bằng tiếng Việt (ví dụ: 'đơn vị hành chính tỉnh Tuyên Quang mới', 'phong tục Tết Nguyên Đán', 'giá vé máy bay').",
                 },
                 "category": {
                     "type": "string",
                     "enum": ["general", "news", "flight", "price", "knowledge"],
-                    "description": "Phân loại tra cứu: general, news, flight (vé máy bay), price (giá cả), knowledge (kiến thức).",
+                    "description": "Phân loại tra cứu: general, news, flight (vé máy bay), price (giá cả), knowledge (địa lý/lịch sử/phong tục/kiến thức).",
                 },
             },
             "required": ["query"],

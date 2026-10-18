@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: theoly-vn-mcp
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: MCP_ENDPOINT
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.8

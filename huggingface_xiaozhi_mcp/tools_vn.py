@@ -135,7 +135,7 @@ def _fetch_wikipedia_vn(query: str) -> str:
 
 
 def _fetch_ddg_web_vn(query: str, max_items: int = 4) -> list[str]:
-    encoded_q = urllib.parse.quote(f"{query} Việt Nam")
+    encoded_q = urllib.parse.quote(query)
     url = f"https://html.duckduckgo.com/html/?q={encoded_q}&kl=vn-vi"
     try:
         html_text = _http_get(url, timeout=2.2)
@@ -478,10 +478,31 @@ def compute_vn_lunar(target_date: datetime.date | None = None) -> str:
 def fetch_vn_weather(location: str = "Tuyên Quang") -> str:
     loc_norm = _strip_accents(location or "tuyen quang").strip()
     lat, lon, city_name = 21.8236, 105.2142, "Tuyên Quang"
+    matched_local = False
     for key, val in PROVINCE_COORDS.items():
         if key in loc_norm:
             lat, lon, city_name = val
+            matched_local = True
             break
+
+    # Nếu người dùng hỏi thành phố trên thế giới hoặc địa danh ngoài bảng tỉnh thành -> Tự động tra tọa độ toàn cầu
+    if not matched_local and location and loc_norm != "tuyen quang":
+        try:
+            geo_url = (
+                f"https://geocoding-api.open-meteo.com/v1/search?"
+                f"name={urllib.parse.quote(location.strip())}&count=1&language=vi&format=json"
+            )
+            geo_raw = _http_get(geo_url, timeout=1.5)
+            geo_data = json.loads(geo_raw)
+            results = geo_data.get("results") or []
+            if results:
+                lat = float(results[0]["latitude"])
+                lon = float(results[0]["longitude"])
+                country = results[0].get("country", "")
+                name_found = results[0].get("name", location.strip())
+                city_name = f"{name_found} ({country})" if country else name_found
+        except Exception:
+            pass
 
     cache_key = f"weather:{city_name}"
     cached = _cache_get(cache_key, ttl=900.0)

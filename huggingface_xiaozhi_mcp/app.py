@@ -228,14 +228,22 @@ async def mcp_websocket_worker(endpoint_url: str) -> None:
 
 async def keep_alive_worker() -> None:
     """
-    Tự động gửi HTTP GET vào chính URL công khai (RENDER_EXTERNAL_URL/health) mỗi 10 phút
-    để giữ cho gói Free của Render.com thức 24/7 không bị ngủ sau 15 phút.
+    1. Làm nóng sẵn bộ nhớ đệm (Pre-warm Cache) cho Thời tiết Tuyên Quang + Giá vàng SJC/Xăng dầu
+       để khi người dùng hỏi trên loa, thời gian phản hồi đạt 0ms (tức thì).
+    2. Tự động gửi HTTP GET vào chính URL công khai (RENDER_EXTERNAL_URL/health) mỗi 10 phút
+       để giữ cho gói Free của Render.com thức 24/7.
     """
     import urllib.request
 
-    await asyncio.sleep(30)
+    await asyncio.sleep(3)
     while True:
         try:
+            # Làm nóng cache ngầm để tốc độ phản hồi trên loa đạt 0-2ms
+            await asyncio.to_thread(
+                execute_vn_tool,
+                "vn_daily_life_hub",
+                {"aspect": "all", "location": "Tuyên Quang"},
+            )
             public_url = (
                 os.environ.get("RENDER_EXTERNAL_URL", "").strip()
                 or os.environ.get("PUBLIC_KEEPALIVE_URL", "").strip()
@@ -248,8 +256,8 @@ async def keep_alive_worker() -> None:
         except asyncio.CancelledError:
             break
         except Exception as e:
-            logger.debug(f"Keep-alive ping error: {e}")
-        await asyncio.sleep(600)  # 10 phút ping 1 lần
+            logger.debug(f"Keep-alive / pre-warm error: {e}")
+        await asyncio.sleep(600)  # 10 phút cập nhật ngầm & ping 1 lần
 
 
 @asynccontextmanager

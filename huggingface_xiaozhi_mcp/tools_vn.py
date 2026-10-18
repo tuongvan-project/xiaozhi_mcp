@@ -176,25 +176,33 @@ def tool_vn_smart_search(query: str, category: str = "general") -> str:
     if cached:
         return cached
 
+    # Chỉ gọi Wikipedia khi tra cứu kiến thức (bỏ qua khi hỏi giá vé, giá cả, tin thời sự để tránh nhiễu)
+    q_lower = clean_q.lower()
+    need_wiki = (
+        cat_lower in ("general", "knowledge")
+        and not any(k in q_lower for k in ("giá vé", "vé máy bay", "giá vàng", "giá xăng", "tỷ giá", "tin tức", "thời sự"))
+    )
+
     # Chạy song song 3 nguồn: Google News VN, Wikipedia VN, và Web Search VN
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         fut_news = pool.submit(_fetch_google_news_vn, search_q, 4)
-        fut_wiki = pool.submit(_fetch_wikipedia_vn, clean_q)
+        fut_wiki = pool.submit(_fetch_wikipedia_vn, clean_q) if need_wiki else None
         fut_web = pool.submit(_fetch_ddg_web_vn, search_q, 3)
 
         news_res = []
         wiki_res = ""
         web_res = []
         try:
-            news_res = fut_news.result(timeout=2.3)
+            news_res = fut_news.result(timeout=2.1)
         except Exception:
             pass
+        if fut_wiki is not None:
+            try:
+                wiki_res = fut_wiki.result(timeout=1.9)
+            except Exception:
+                pass
         try:
-            wiki_res = fut_wiki.result(timeout=2.1)
-        except Exception:
-            pass
-        try:
-            web_res = fut_web.result(timeout=2.3)
+            web_res = fut_web.result(timeout=2.1)
         except Exception:
             pass
 
@@ -526,9 +534,12 @@ def fetch_vn_market_prices() -> str:
                 ]
                 if len(cols) >= 4:
                     v_name, buy, sell = cols[1], cols[2], cols[3]
-                    if "Vàng SJC 1L" in v_name or "SJC 1L, 10L" in v_name:
-                        g_items.append(f"Vàng SJC mua vào {buy} đ/chỉ, bán ra {sell} đ/chỉ")
-                    elif "Vàng nhẫn SJC" in v_name and len(g_items) < 2:
+                    # Chỉ lấy dòng chứa giá số thực tế, bỏ qua các dòng chữ quảng cáo webgia.com
+                    if not (re.search(r"\d{3}", buy) and re.search(r"\d{3}", sell)):
+                        continue
+                    if ("Vàng SJC 1L" in v_name or "SJC" in v_name) and len(g_items) == 0:
+                        g_items.append(f"Vàng miếng SJC mua vào {buy} đ/chỉ, bán ra {sell} đ/chỉ")
+                    elif "Vàng nhẫn" in v_name and len(g_items) < 2:
                         g_items.append(f"Vàng nhẫn SJC mua vào {buy} đ/chỉ, bán ra {sell} đ/chỉ")
             if g_items:
                 gold_info = "; ".join(g_items)
@@ -582,9 +593,18 @@ def tool_vn_daily_life_hub(
         return fetch_vn_market_prices()
 
     lunar_part = compute_vn_lunar(target_dt)
-    weather_part = fetch_vn_weather(location)
-    market_part = fetch_vn_market_prices()
-    return f"{time_prefix} {lunar_part} {weather_part} {market_part}"
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        f_w = pool.submit(fetch_vn_weather, location)
+        f_m = pool.submit(fetch_vn_market_prices)
+        try:
+            weather_part = f_w.result(timeout=2.2)
+        except Exception:
+            weather_part = f"Thời tiết tại {location}: Trời mát mẻ."
+        try:
+            market_part = f_m.result(timeout=2.2)
+        except Exception:
+            market_part = ""
+    return f"{time_prefix} {lunar_part} {weather_part} {market_part}".strip()
 
 
 # ==============================================================================

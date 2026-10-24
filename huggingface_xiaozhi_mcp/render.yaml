@@ -3,8 +3,8 @@ services:
     name: theoly-vn-mcp
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    buildCommand: curl -fsSL https://deno.land/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && pip install -r requirements.txt
+    startCommand: export PATH="$HOME/.deno/bin:$PATH" && python app.py
     envVars:
       - key: MCP_ENDPOINT
         sync: false

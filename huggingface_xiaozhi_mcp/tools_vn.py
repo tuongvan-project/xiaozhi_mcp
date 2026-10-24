@@ -899,8 +899,16 @@ def tool_vn_health_and_nutrition(
 
 
 # ==============================================================================
-# 5. SIÊU CÔNG CỤ TÌM TÊN BÀI HÁT QUA LỜI & ĐỐ VUI VĂN HÓA VIỆT NAM
+# 5. SIÊU CÔNG CỤ ÂM NHẠC YOUTUBE MP3, RADIO TRỰC TIẾP & ĐỐ VUI DÂN GIAN
 # ==============================================================================
+
+RADIO_STATIONS_VN: dict[str, tuple[str, str]] = {
+    "vov1": ("Đài Tiếng Nói Việt Nam - VOV1 (Thời sự)", "http://media.vov.vn:8010/vov1"),
+    "vov2": ("Đài Tiếng Nói Việt Nam - VOV2 (Văn hóa - Xã hội)", "http://media.vov.vn:8010/vov2"),
+    "vov3": ("Đài Tiếng Nói Việt Nam - VOV3 (Âm nhạc - Giải trí)", "http://media.vov.vn:8010/vov3"),
+    "voh": ("Đài Tiếng nói Nhân dân TP.HCM - VOH", "http://stream.voh.com.vn:8000/voh999"),
+    "vovgt": ("Đài Tiếng Nói Việt Nam - VOV Giao thông", "http://media.vov.vn:8010/vovgt"),
+}
 
 VN_RIDDLES: list[tuple[str, str]] = [
     ("Con gì đập thì sống, không đập thì chết?", "Đáp án: Trái tim."),
@@ -911,15 +919,89 @@ VN_RIDDLES: list[tuple[str, str]] = [
 ]
 
 
+def search_youtube_fast(query: str, max_results: int = 5) -> list[dict[str, str]]:
+    """
+    Tìm kiếm YouTube siêu nhanh qua InnerTube REST API (< 1.2s).
+    Trích xuất Video ID, Tên bài hát, Thời lượng và Ảnh bìa chất lượng cao (hqdefault.jpg).
+    """
+    cache_key = f"yt_fast_{query.lower().strip()}"
+    cached = _cache_get(cache_key, ttl=3600)
+    if cached:
+        try:
+            return json.loads(cached)
+        except Exception:
+            pass
+
+    payload = json.dumps({
+        "context": {
+            "client": {
+                "clientName": "WEB",
+                "clientVersion": "2.20240101.00.00",
+            }
+        },
+        "query": query,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://www.youtube.com/youtubei/v1/search",
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+    )
+
+    results: list[dict[str, str]] = []
+    try:
+        with urllib.request.urlopen(req, timeout=2.5, context=_SSL_CTX) as resp:
+            raw = json.loads(resp.read().decode("utf-8", errors="ignore"))
+
+        sections = (
+            raw.get("contents", {})
+            .get("twoColumnSearchResultsRenderer", {})
+            .get("primaryContents", {})
+            .get("sectionListRenderer", {})
+            .get("contents", [])
+        )
+        for sec in sections:
+            items = sec.get("itemSectionRenderer", {}).get("contents", [])
+            for it in items:
+                v = it.get("videoRenderer")
+                if not v:
+                    continue
+                vid = v.get("videoId")
+                if not vid:
+                    continue
+                title_runs = v.get("title", {}).get("runs", [])
+                title = title_runs[0].get("text") if title_runs else ""
+                dur_text = v.get("lengthText", {}).get("simpleText", "")
+                results.append({
+                    "id": vid,
+                    "title": title,
+                    "duration": dur_text,
+                    "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+                })
+                if len(results) >= max_results:
+                    break
+            if len(results) >= max_results:
+                break
+
+        if results:
+            _cache_set(cache_key, json.dumps(results, ensure_ascii=False))
+    except Exception as e:
+        logger.warning(f"Lỗi tìm kiếm YouTube InnerTube: {e}")
+
+    return results
+
+
 def tool_vn_music_and_culture(
     song_or_lyric_hint: str = "",
+    is_playlist: bool = False,
     get_riddle: bool = False,
 ) -> str:
     """
-    Trợ lý Văn hóa & Âm nhạc (Không xung đột với trình phát nhạc của xiaozhi.me):
-    - Khi người dùng nhớ mang máng lời bài hát hoặc hỏi bài hát mới của ca sĩ: Tìm ra đúng Tên bài hát chuẩn + Ca sĩ
-      để AI gọi lệnh phát nhạc chính xác.
-    - Cung cấp câu đố vui trí tuệ dân gian cho gia đình và các bé.
+    Trợ lý Âm nhạc & Văn hóa Toàn diện cho Theo Ly:
+    - Tìm kiếm và giải mã nguồn phát YouTube MP3 chất lượng cao, bài hát theo ca sĩ,
+      hoặc tuyển tập/liên khúc/playlist 1-2 tiếng kèm ảnh bìa video chuẩn cho ST7789.
+    - Cung cấp luồng Radio trực tiếp các kênh VOV1, VOV2, VOV3, VOH.
+    - Đố vui dân gian Việt Nam.
     """
     if get_riddle:
         q, a = random.choice(VN_RIDDLES)
@@ -927,17 +1009,67 @@ def tool_vn_music_and_culture(
 
     hint = (song_or_lyric_hint or "").strip()
     if not hint:
-        return "Vui lòng nhập lời bài hát hoặc tên ca sĩ cần tra cứu."
+        return "Vui lòng cho biết tên bài hát, ca sĩ, hoặc kênh phát thanh cần nghe."
 
-    web_hits = _fetch_ddg_web_vn(f"bài hát {hint} lời bài hát ca sĩ", max_items=3)
-    news_hits = _fetch_google_news_vn(f"bài hát {hint}", max_items=2)
-    combined = " | ".join(web_hits + news_hits)
+    h_lower = hint.lower()
+
+    # 1. Kiểm tra yêu cầu Đài Radio trực tiếp
+    for r_key, (r_name, r_url) in RADIO_STATIONS_VN.items():
+        if r_key in h_lower or (r_key == "vovgt" and "giao thông" in h_lower):
+            return (
+                f"Đang mở kênh {r_name} trực tiếp. "
+                f"(Hướng dẫn Theo Ly: Hãy gọi ngay self.music.play(query='{r_url}', title='{r_name}') "
+                f"hoặc self.radio.play(channel='{r_key}') và không nói thêm lời thừa để phát ngay lập tức)."
+            )
+
+    # 2. Xử lý yêu cầu Playlist / Tuyển tập / Liên khúc / Remix
+    is_pl = is_playlist or any(k in h_lower for k in [
+        "playlist", "tuyển tập", "tuyen tap", "liên khúc", "lien khuc", "lk ",
+        "album", "remix", "nonstop", "nhạc dài", "nghe liên tục"
+    ])
+
+    search_q = f"{hint} tuyển tập liên khúc playlist hay nhất" if is_pl else hint
+
+    # 3. Tìm kiếm bài hát trên YouTube (< 1.2s)
+    results = search_youtube_fast(search_q, max_results=3)
+
+    public_url = (
+        os.environ.get("RENDER_EXTERNAL_URL", "").strip()
+        or os.environ.get("PUBLIC_KEEPALIVE_URL", "").strip()
+        or "https://xiaozhi-mcp.onrender.com"
+    ).rstrip("/")
+
+    if results:
+        top = results[0]
+        vid = top["id"]
+        title = _clean_for_speech(top["title"], 100)
+        dur = top.get("duration", "")
+        stream_url = f"{public_url}/stream?v={vid}"
+        cover_url = top.get("thumbnail", f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg")
+        dur_info = f" (Thời lượng: {dur})" if dur else ""
+
+        return (
+            f"Tìm thấy bài hát: {title}{dur_info}. "
+            f"Đường dẫn âm thanh trực tiếp: {stream_url}. "
+            f"Ảnh bìa YouTube: {cover_url}. "
+            f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay lập tức công cụ "
+            f"self.music.play(query='{stream_url}', title='{title}') "
+            f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức)."
+        )
+
+    # 4. Dự phòng: Tìm lời bài hát hoặc gợi ý gọi công cụ nội bộ
+    web_hits = _fetch_ddg_web_vn(f"bài hát {hint} lời bài hát ca sĩ", max_items=2)
+    combined = " | ".join(web_hits)
     if combined:
         return (
-            f"Kết quả nhận diện bài hát cho '{hint}': {_clean_for_speech(combined, 450)}. "
-            f"(Hướng dẫn cho Theo Ly: Hãy lấy tên bài hát chuẩn xác nhất vừa tìm được để gọi công cụ phát nhạc của thiết bị)."
+            f"Gợi ý bài hát cho '{hint}': {_clean_for_speech(combined, 300)}. "
+            f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay self.music.play(query='{hint}') để thiết bị tự tìm và phát nhạc)."
         )
-    return f"Gợi ý bài hát '{hint}': Hãy thử gọi công cụ phát nhạc với tên bài hát ngắn gọn nhất."
+
+    return (
+        f"Đang tìm bài hát '{hint}'. "
+        f"(Hướng dẫn Theo Ly: Hãy gọi ngay self.music.play(query='{hint}') để thiết bị phát bài hát này)."
+    )
 
 
 # ==============================================================================
@@ -1125,15 +1257,21 @@ MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
     {
         "name": "vn_music_and_culture",
         "description": (
-            "Tìm tên bài hát chuẩn xác và tên ca sĩ thông qua một câu hát hoặc gợi ý chủ đề âm nhạc; "
-            "hoặc lấy câu đố vui trí tuệ dân gian cho gia đình. (Lưu ý: Không dùng thay công cụ phát nhạc trực tiếp khi đã biết rõ tên bài)."
+            "Tìm kiếm và giải mã nguồn phát nhạc YouTube MP3 chất lượng cao, bài hát theo ca sĩ, "
+            "playlist tuyển tập liên khúc 1-2 tiếng, hoặc kênh Radio VOV trực tiếp; "
+            "đồng thời cung cấp câu đố vui dân gian. Khi người dùng muốn nghe bài hát, ca sĩ, remix, hoặc playlist, "
+            "hãy gọi công cụ này để lấy luồng âm thanh và ảnh bìa video chuẩn xác."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "song_or_lyric_hint": {
                     "type": "string",
-                    "description": "Câu hát nhớ mang máng hoặc mô tả bài hát cần tìm tên chuẩn.",
+                    "description": "Tên bài hát, ca sĩ, câu hát, hoặc yêu cầu playlist/liên khúc (ví dụ: 'Tìm lại bầu trời Tuấn Hưng', 'Playlist nhạc trẻ remix', 'VOV1').",
+                },
+                "is_playlist": {
+                    "type": "boolean",
+                    "description": "Đặt true nếu người dùng muốn nghe playlist, tuyển tập, liên khúc, hoặc nghe nhiều bài liên tục.",
                 },
                 "get_riddle": {
                     "type": "boolean",
@@ -1205,6 +1343,7 @@ def execute_vn_tool(name: str, arguments: dict[str, Any] | None) -> str:
         if name == "vn_music_and_culture":
             return tool_vn_music_and_culture(
                 song_or_lyric_hint=str(args.get("song_or_lyric_hint", "")),
+                is_playlist=bool(args.get("is_playlist", False)),
                 get_riddle=bool(args.get("get_riddle", False)),
             )
         if name == "vn_family_notebook":

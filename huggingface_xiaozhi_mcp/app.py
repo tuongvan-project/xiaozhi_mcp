@@ -20,10 +20,10 @@ from typing import Any
 
 import uvicorn
 import websockets
-from fastapi import FastAPI, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
-from tools_vn import MCP_TOOLS_SCHEMA, execute_vn_tool
+from tools_vn import MCP_TOOLS_SCHEMA, execute_vn_tool, search_youtube_fast
 
 logging.basicConfig(
     level=logging.INFO,
@@ -308,6 +308,169 @@ async def test_tool_api(
     res = await asyncio.to_thread(execute_vn_tool, name, parsed_args)
     ms = int((time.perf_counter() - t0) * 1000)
     return JSONResponse({"tool": name, "elapsed_ms": ms, "result": res})
+
+
+# ==============================================================================
+# HỆ THỐNG YOUTUBE MP3 STREAMER & SEARCH ENDPOINT (TƯƠNG THÍCH ESP32 & DOMEE)
+# ==============================================================================
+
+_AUDIO_STREAM_CACHE: dict[str, tuple[float, str]] = {}
+
+
+def _get_youtube_audio_url(video_id: str) -> str:
+    """
+    Trích xuất Direct Google Video Audio URL từ YouTube (định dạng AAC/m4a itag 140 hoặc Opus).
+    Sử dụng bộ nhớ đệm RAM TTL 4 giờ để seek/tua/phát lại đạt 0ms tức thì.
+    """
+    now = time.monotonic()
+    if video_id in _AUDIO_STREAM_CACHE:
+        ts, url = _AUDIO_STREAM_CACHE[video_id]
+        if now - ts < 14400:  # 4 giờ
+            return url
+
+    import yt_dlp
+
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "format": "140/ba/b",
+        "socket_timeout": 6,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(video_id, download=False)
+        stream_url = info.get("url")
+        if not stream_url:
+            raise ValueError(f"Không thể trích xuất audio stream cho video {video_id}")
+        _AUDIO_STREAM_CACHE[video_id] = (now, stream_url)
+        return stream_url
+
+
+@app.get("/search")
+async def search_youtube_endpoint(q: str = ""):
+    """
+    Endpoint tìm kiếm chuẩn tương thích 100% với cấu trúc JSON của firmware Domee / ESP32.
+    Trả về cả cấu trúc 'results' và 'data.search' (episode).
+    """
+    import urllib.parse
+    q = urllib.parse.unquote_plus(q or "").strip()
+    if not q:
+        return JSONResponse({"count": 0, "results": [], "data": {"search": []}})
+
+    results = await asyncio.to_thread(search_youtube_fast, q, 5)
+
+    public_url = (
+        os.environ.get("RENDER_EXTERNAL_URL", "").strip()
+        or os.environ.get("PUBLIC_KEEPALIVE_URL", "").strip()
+        or ""
+    ).rstrip("/")
+
+    episodes = []
+    res_list = []
+    for r in results:
+        vid = r["id"]
+        stream_url = f"{public_url}/stream?v={vid}" if public_url else f"/stream?v={vid}"
+        thumb = r.get("thumbnail", f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg")
+        title = r.get("title", "")
+        dur = r.get("duration", "")
+
+        res_list.append({
+            "id": vid,
+            "title": title,
+            "duration": dur,
+            "thumbnail": thumb,
+            "stream_url": stream_url,
+        })
+        episodes.append({
+            "episode": {
+                "title": title,
+                "audio": stream_url,
+                "duration": dur,
+                "media": {
+                    "content_type": {"description": "audio/mp4"},
+                    "cover": thumb,
+                },
+            }
+        })
+
+    return JSONResponse({
+        "count": len(results),
+        "results": res_list,
+        "data": {"search": episodes},
+    })
+
+
+@app.get("/stream")
+async def stream_youtube_audio(v: str, request: Request):
+    """
+    Bóc tách và stream âm thanh thời gian thực từ YouTube xuống loa ESP32:
+    - Bóc tách Google Video audio stream URL qua yt-dlp.
+    - Hỗ trợ Range header (tua/seek/resume bài hát).
+    - Forward stream từng chunk 32KB nhẹ nhàng, không lưu file tạm vào đĩa.
+    """
+    import urllib.request
+    import urllib.error
+
+    v = (v or "").strip()
+    if not v:
+        raise HTTPException(status_code=400, detail="Missing video ID (v parameter)")
+
+    try:
+        stream_url = await asyncio.to_thread(_get_youtube_audio_url, v)
+    except Exception as e:
+        logger.error(f"Lỗi trích xuất audio YouTube ({v}): {e}")
+        raise HTTPException(status_code=502, detail=f"Lỗi trích xuất audio YouTube: {e}")
+
+    req_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    }
+    client_range = request.headers.get("Range")
+    if client_range:
+        req_headers["Range"] = client_range
+
+    try:
+        upstream_req = urllib.request.Request(stream_url, headers=req_headers)
+        upstream_resp = urllib.request.urlopen(upstream_req, timeout=12)
+    except urllib.error.HTTPError as he:
+        if he.code == 403:
+            _AUDIO_STREAM_CACHE.pop(v, None)
+            stream_url = await asyncio.to_thread(_get_youtube_audio_url, v)
+            upstream_req = urllib.request.Request(stream_url, headers=req_headers)
+            upstream_resp = urllib.request.urlopen(upstream_req, timeout=12)
+        else:
+            raise HTTPException(status_code=he.code, detail=str(he))
+
+    status_code = upstream_resp.status
+    content_type = upstream_resp.headers.get("Content-Type", "audio/mp4")
+    content_length = upstream_resp.headers.get("Content-Length")
+    content_range = upstream_resp.headers.get("Content-Range")
+    accept_ranges = upstream_resp.headers.get("Accept-Ranges", "bytes")
+
+    resp_headers = {
+        "Content-Type": content_type,
+        "Accept-Ranges": accept_ranges,
+        "Access-Control-Allow-Origin": "*",
+    }
+    if content_length:
+        resp_headers["Content-Length"] = content_length
+    if content_range:
+        resp_headers["Content-Range"] = content_range
+
+    def chunk_generator():
+        try:
+            while True:
+                chunk = upstream_resp.read(32768)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            upstream_resp.close()
+
+    return StreamingResponse(
+        chunk_generator(),
+        status_code=status_code,
+        headers=resp_headers,
+        media_type=content_type,
+    )
 
 
 @app.get("/", response_class=HTMLResponse)

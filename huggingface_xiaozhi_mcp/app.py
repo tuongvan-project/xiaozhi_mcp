@@ -333,15 +333,17 @@ def _get_youtube_audio_url(video_id: str) -> str:
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
-        "format": "ba[ext=m4a]/ba/b",
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android_vr", "tv_embedded", "visionos"],
-            }
-        },
-        "socket_timeout": 6,
+        "format": "ba/b",
+        "remote_components": ["ejs:github"],
+        "socket_timeout": 8,
     }
 
+    # Ưu tiên 1: Đọc cookies.txt đính kèm trực tiếp trong repo
+    local_cookie = os.path.join(os.path.dirname(__file__), "cookies.txt")
+    if os.path.exists(local_cookie) and os.path.getsize(local_cookie) > 50:
+        ydl_opts["cookiefile"] = local_cookie
+
+    # Ưu tiên 2: Biến môi trường YOUTUBE_COOKIES cấu hình trên Render
     cookies_content = os.environ.get("YOUTUBE_COOKIES", "").strip()
     if cookies_content:
         import tempfile

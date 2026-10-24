@@ -333,7 +333,12 @@ def _get_youtube_audio_url(video_id: str) -> str:
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
-        "format": "140/ba/b",
+        "format": "ba[ext=m4a]/ba/b",
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android_vr", "tv_embedded", "visionos"],
+            }
+        },
         "socket_timeout": 6,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:

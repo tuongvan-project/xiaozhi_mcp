@@ -341,6 +341,14 @@ def _get_youtube_audio_url(video_id: str) -> str:
         },
         "socket_timeout": 6,
     }
+
+    cookies_content = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if cookies_content:
+        import tempfile
+        cookie_file = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
+        with open(cookie_file, "w", encoding="utf-8") as f:
+            f.write(cookies_content)
+        ydl_opts["cookiefile"] = cookie_file
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(video_id, download=False)
         stream_url = info.get("url")

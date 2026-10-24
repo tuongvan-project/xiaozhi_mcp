@@ -328,6 +328,11 @@ def _get_youtube_audio_url(video_id: str) -> str:
         if now - ts < 14400:  # 4 giờ
             return url
 
+    # Đảm bảo Deno nằm trong PATH để yt-dlp tự động giải mã chữ ký cipher
+    deno_bin = os.path.expanduser("~/.deno/bin")
+    if os.path.exists(deno_bin) and deno_bin not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = deno_bin + os.pathsep + os.environ.get("PATH", "")
+
     import yt_dlp
 
     ydl_opts = {

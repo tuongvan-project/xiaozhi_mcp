@@ -292,7 +292,7 @@ async def serve_audio_file(file_name: str, request: Request):
     range_header = request.headers.get("Range")
     ua = request.headers.get("user-agent", "Unknown")
     client_ip = request.client.host if request.client else "unknown"
-    _add_log(f"AUDIO STREAM: '{safe_name}' ({file_size}B) cho {client_ip} | UA: {ua} | Range: {range_header}")
+    _log_event(f"AUDIO STREAM: '{safe_name}' ({file_size}B) cho {client_ip} | UA: {ua} | Range: {range_header}")
 
     if range_header:
         range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)

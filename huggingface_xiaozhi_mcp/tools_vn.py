@@ -1300,51 +1300,27 @@ MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
         },
     },
     {
-        "name": "play_music",
+        "name": "vn_cloud_music",
         "description": (
-            "CÔNG CỤ PHÁT NHẠC VÀ AUDIO ĐÁM MÂY CHÍNH THỨC. "
+            "CÔNG CỤ PHÁT NHẠC VÀ AUDIO ĐÁM MÂY CÁ NHÂN VIỆT NAM (Cloud Audio Hub). "
             "BẮT BUỘC gọi công cụ này BẤT CỨ KHI NÀO người dùng yêu cầu: mở bài hát, nghe nhạc, phát nhạc, bật bài, "
-            "tìm bài hát theo ca sĩ, nhạc trẻ, remix, nhạc thiền 432Hz, chuông 528Hz, tiếng gió rừng, hoặc nhạc Cloudflare (ví dụ: 'Mở bài Lạc Trôi', 'Bật nhạc thiền', 'Nghe nhạc'). "
-            "TUYỆT ĐỐI KHÔNG dùng công cụ nhạc mặc định của hệ thống và KHÔNG tự ý báo không tìm thấy bài hát. "
-            "Công cụ này sẽ lấy luồng âm thanh MP3 trực tiếp từ Kho Nhạc Đám Mây Cá Nhân để thiết bị phát ngay lập tức."
+            "tìm bài hát theo ca sĩ, nhạc trẻ, remix, nhạc thiền 432Hz, chuông 528Hz, tiếng gió rừng, nhạc Cloudflare, "
+            "hoặc đài Radio VOV (ví dụ: 'Mở bài Lạc Trôi', 'Bật nhạc thiền', 'Nghe giai điệu chuông', 'Mở bài Tìm lại bầu trời', 'Mở nhạc'). "
+            "Công cụ này trả về luồng MP3 trực tiếp từ Kho Nhạc Đám Mây để thiết bị phát ngay lập tức."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
-                "song_name": {
+                "song_query": {
                     "type": "string",
-                    "description": "Tên bài hát, ca sĩ, giai điệu hoặc yêu cầu âm nhạc (ví dụ: 'Lạc Trôi', 'Nhạc thiền 432Hz', 'Giai điệu chuông', 'Cloudflare').",
+                    "description": "Tên bài hát, ca sĩ, giai điệu hoặc yêu cầu âm nhạc (ví dụ: 'Lạc Trôi', 'Nhạc thiền 432Hz', 'Giai điệu chuông', 'Cloudflare', 'VOV1').",
                 },
                 "is_playlist": {
                     "type": "boolean",
                     "description": "Đặt true nếu người dùng muốn nghe nhiều bài liên tục hoặc liên khúc.",
                 },
             },
-            "required": ["song_name"],
-        },
-    },
-    {
-        "name": "vn_music_and_culture",
-        "description": (
-            "Tìm kiếm và phát nhạc MP3 từ Kho Nhạc Đám Mây Cá Nhân; cung cấp kênh Radio VOV trực tiếp và câu đố vui dân gian. "
-            "Khi người dùng muốn nghe bài hát, ca sĩ, remix, hoặc playlist, hãy gọi công cụ này."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "song_or_lyric_hint": {
-                    "type": "string",
-                    "description": "Tên bài hát, ca sĩ, câu hát, hoặc yêu cầu playlist/liên khúc (ví dụ: 'Tìm lại bầu trời Tuấn Hưng', 'Playlist nhạc trẻ remix', 'VOV1').",
-                },
-                "is_playlist": {
-                    "type": "boolean",
-                    "description": "Đặt true nếu người dùng muốn nghe playlist, tuyển tập, liên khúc, hoặc nghe nhiều bài liên tục.",
-                },
-                "get_riddle": {
-                    "type": "boolean",
-                    "description": "Đặt true nếu người dùng muốn chơi đố vui dân gian.",
-                },
-            },
+            "required": ["song_query"],
         },
     },
     {
@@ -1407,8 +1383,8 @@ def execute_vn_tool(name: str, arguments: dict[str, Any] | None) -> str:
                 gender=str(args.get("gender", "nam")),
                 food_query=str(args.get("food_query", "")),
             )
-        if name in ("play_music", "vn_music_and_culture"):
-            hint = str(args.get("song_name") or args.get("song_or_lyric_hint") or "")
+        if name in ("vn_cloud_music", "vn_music_and_culture", "play_music"):
+            hint = str(args.get("song_query") or args.get("song_name") or args.get("song_or_lyric_hint") or "")
             return tool_vn_music_and_culture(
                 song_or_lyric_hint=hint,
                 is_playlist=bool(args.get("is_playlist", False)),

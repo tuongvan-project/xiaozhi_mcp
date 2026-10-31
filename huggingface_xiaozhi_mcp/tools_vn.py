@@ -1041,9 +1041,6 @@ def tool_vn_music_and_culture(
             return (
                 f"Đang phát nhạc: {c_title} - {c_artist}. "
                 f"(Lệnh phát: self.music.play(query='{c_url}', title='{c_title}'))"
-            ) "
-                f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức. "
-                f"TUYỆT ĐỐI CẤM dùng self.music.action và CẤM gọi search.music vì thiết bị chỉ hỗ trợ self.music.play."
             )
     except Exception as e_hub:
         logger.warning(f"Cloud music hub lookup error: {e_hub}")

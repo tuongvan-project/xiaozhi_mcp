@@ -335,28 +335,43 @@ def _get_youtube_audio_url(video_id: str) -> str:
 
     import yt_dlp
 
-    ydl_opts = {
+    # Cơ chế giả lập Vanced / Android client: không cần đăng nhập, không quảng cáo, vượt qua chặn Data Center
+    base_ydl_opts: dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
-        "format": "ba/b",
+        "format": "ba[ext=m4a]/ba[ext=mp3]/140/18/ba/b",
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios", "web_safari"],
+            }
+        },
         "remote_components": ["ejs:github"],
-        "socket_timeout": 8,
+        "socket_timeout": 10,
     }
 
-    # Ưu tiên 1: Đọc cookies.txt đính kèm trực tiếp trong repo
-    local_cookie = os.path.join(os.path.dirname(__file__), "cookies.txt")
-    if os.path.exists(local_cookie) and os.path.getsize(local_cookie) > 50:
-        ydl_opts["cookiefile"] = local_cookie
+    # Vòng 1: Thử trích xuất trực tiếp bằng danh tính Android Vanced (tỷ lệ thành công cao nhất, không dính cookie rác)
+    try:
+        with yt_dlp.YoutubeDL(base_ydl_opts) as ydl:
+            info = ydl.extract_info(video_id, download=False)
+            stream_url = info.get("url")
+            if stream_url:
+                _AUDIO_STREAM_CACHE[video_id] = (now, stream_url)
+                return stream_url
+    except Exception as e_vanced:
+        logger.warning(f"Vanced extraction failed for {video_id}, trying fallback: {e_vanced}")
 
-    # Ưu tiên 2: Biến môi trường YOUTUBE_COOKIES cấu hình trên Render
+    # Vòng 2: Dự phòng dùng cookie nếu có cấu hình biến môi trường YOUTUBE_COOKIES
     cookies_content = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    fallback_opts = dict(base_ydl_opts)
+    fallback_opts["format"] = "bestaudio/best"
     if cookies_content:
         import tempfile
         cookie_file = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
         with open(cookie_file, "w", encoding="utf-8") as f:
             f.write(cookies_content)
-        ydl_opts["cookiefile"] = cookie_file
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        fallback_opts["cookiefile"] = cookie_file
+
+    with yt_dlp.YoutubeDL(fallback_opts) as ydl:
         info = ydl.extract_info(video_id, download=False)
         stream_url = info.get("url")
         if not stream_url:

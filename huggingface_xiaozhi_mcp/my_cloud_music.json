@@ -1,0 +1,114 @@
+{
+  "songs": [
+    {
+      "id": "soundhelix_sample",
+      "title": "SoundHelix Instrumental Sample",
+      "artist": "SoundHelix Studio",
+      "tags": [
+        "sample",
+        "test",
+        "instrumental",
+        "nhac khong loi",
+        "soundhelix"
+      ],
+      "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+      "local_file": "soundhelix_test.mp3",
+      "duration": "06:12",
+      "bitrate": "192kbps"
+    },
+    {
+      "id": "nhac_thien_432hz",
+      "title": "Nhạc Thiền Thư Giãn Sóng Tần Số 432Hz",
+      "artist": "Theo Ly Healing Cloud",
+      "tags": [
+        "nhac thien",
+        "thu gian",
+        "ngu ngon",
+        "song nao",
+        "432hz",
+        "healing"
+      ],
+      "local_file": "nhac_thien_thu_gian.mp3",
+      "duration": "00:30",
+      "bitrate": "128kbps"
+    },
+    {
+      "id": "chuong_nhip_dieu_528hz",
+      "title": "Giai Điệu Chuông Thư Thái 528Hz",
+      "artist": "Theo Ly Sound Lab",
+      "tags": [
+        "chuong",
+        "nhip dieu",
+        "nang luong",
+        "528hz",
+        "chuong bao thuc"
+      ],
+      "local_file": "chuong_nhip_dieu.mp3",
+      "duration": "00:20",
+      "bitrate": "128kbps"
+    },
+    {
+      "id": "am_thanh_tu_nhien",
+      "title": "Âm Thanh Thiên Nhiên Tiếng Gió Rừng Xanh",
+      "artist": "Theo Ly Forest Sound",
+      "tags": [
+        "thien nhien",
+        "gio rung",
+        "tieng gio",
+        "rung xanh",
+        "tieng chim",
+        "tieng mua"
+      ],
+      "local_file": "am_thanh_tu_nhien.mp3",
+      "duration": "00:30",
+      "bitrate": "128kbps"
+    },
+    {
+      "id": "lac_troi",
+      "title": "Lạc Trôi (Acoustic / Beat)",
+      "artist": "Sơn Tùng M-TP",
+      "tags": [
+        "lac troi",
+        "son tung",
+        "mtp",
+        "nhac tre",
+        "acoustic"
+      ],
+      "url": "https://archive.org/download/lac-troi-sample/lac_troi.mp3",
+      "local_file": "",
+      "duration": "04:33",
+      "bitrate": "128kbps"
+    },
+    {
+      "id": "tim_lai_bau_troi",
+      "title": "Tìm Lại Bầu Trời",
+      "artist": "Tuấn Hưng",
+      "tags": [
+        "tim lai bau troi",
+        "tuan hung",
+        "nhac tre"
+      ],
+      "url": "https://archive.org/download/tim-lai-bau-troi-sample/tim_lai_bau_troi.mp3",
+      "local_file": "",
+      "duration": "04:12",
+      "bitrate": "128kbps"
+    },
+    {
+      "id": "lk_remix_soi_dong",
+      "title": "Liên Khúc Nhạc Trẻ Remix Sôi Động",
+      "artist": "Nhiều Ca Sĩ",
+      "tags": [
+        "remix",
+        "nonstop",
+        "lien khuc",
+        "nhac tre remix",
+        "lk",
+        "soi dong"
+      ],
+      "url": "https://archive.org/download/lk-remix-sample/lk_remix.mp3",
+      "local_file": "",
+      "duration": "15:20",
+      "bitrate": "128kbps"
+    }
+  ]
+}

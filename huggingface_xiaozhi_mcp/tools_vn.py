@@ -1022,15 +1022,21 @@ def tool_vn_music_and_culture(
                 f"hoặc self.radio.play(channel='{r_key}') và không nói thêm lời thừa để phát ngay lập tức)."
             )
 
-    # 2. ƯU TIÊN SỐ 1: TRA CỨU KHO NHẠC ĐÁM MÂY CÁ NHÂN (Cloudflare R2 / Direct CDN - 0ms, không chặn bot)
+    public_url = (
+        os.environ.get("RENDER_EXTERNAL_URL", "").strip()
+        or os.environ.get("PUBLIC_KEEPALIVE_URL", "").strip()
+        or "https://xiaozhi-mcp.onrender.com"
+    ).rstrip("/")
+
+    # 2. ƯU TIÊN TUYỆT ĐỐI SỐ 1: KHO NHẠC & AUDIO ĐÁM MÂY CÁ NHÂN (Cloudflare R2 / Server MP3 Direct - 0ms, không chặn bot)
     try:
         from cloud_music_hub import CloudMusicHub
         hub = CloudMusicHub()
-        cloud_song = hub.search_song(hint)
+        cloud_song = hub.search_song(hint, public_url=public_url)
         if cloud_song:
             c_title = cloud_song.get("title", hint)
             c_artist = cloud_song.get("artist", "")
-            c_url = cloud_song.get("url", "")
+            c_url = cloud_song.get("stream_url") or cloud_song.get("url", "")
             c_dur = cloud_song.get("duration", "")
             dur_info = f" (Thời lượng: {c_dur})" if c_dur else ""
             logger.info(f"Phát hiện bài hát '{c_title}' trong kho cá nhân: {c_url}")
@@ -1042,7 +1048,26 @@ def tool_vn_music_and_culture(
                 f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức)."
             )
     except Exception as e_hub:
-        logger.debug(f"Cloud music hub lookup: {e_hub}")
+        logger.warning(f"Cloud music hub lookup error: {e_hub}")
+
+    # 3. NẾU CHƯA CÓ TRONG KHO: ĐỀ XUẤT PHÁT BÀI CÓ SẴN TRONG KHO ĐÁM MÂY HOẶC RADIO ĐỂ TRÁNH CÂM TIẾNG (0 BYTES)
+    try:
+        all_songs = hub.list_songs(public_url=public_url)
+        available = [s for s in all_songs if s.get("stream_url")]
+        if available:
+            # Chọn bài ngẫu nhiên hoặc bài đầu tiên
+            fallback_song = available[0]
+            fb_title = fallback_song.get("title", "Giai Điệu Thư Thái")
+            fb_url = fallback_song.get("stream_url", "")
+            return (
+                f"Bài hát '{hint}' chưa có trong kho nhạc cá nhân. Đang mở bài hát có sẵn trên đám mây: {fb_title}. "
+                f"Đường dẫn âm thanh trực tiếp: {fb_url}. "
+                f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay lập tức công cụ "
+                f"self.music.play(query='{fb_url}', title='{fb_title}') "
+                f"và nhắc ngắn gọn người dùng có thể tải thêm nhạc lên kho đám mây tại web Theo Ly)."
+            )
+    except Exception as e_fb:
+        logger.warning(f"Fallback song error: {e_fb}")
 
     # 3. Xử lý yêu cầu Playlist / Tuyển tập / Liên khúc / Remix
     is_pl = is_playlist or any(k in h_lower for k in [

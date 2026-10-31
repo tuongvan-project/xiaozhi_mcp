@@ -1,4 +1,5 @@
 *.json
 !render.yaml
+!huggingface_xiaozhi_mcp/my_cloud_music.json
 __pycache__/
 *.pyc

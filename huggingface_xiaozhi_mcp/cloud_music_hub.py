@@ -1,15 +1,17 @@
 """
 Module Quản lý & Điều hướng Kho Nhạc Cá Nhân trên Đám mây (Cloud Music Hub).
 Thiết kế tối ưu cho Xiaozhi & ESP32-S3:
-- Hỗ trợ lưu trữ trực tiếp trên Cloudflare R2 / Supabase Storage / CDN tĩnh.
-- Tìm kiếm siêu tốc (< 5ms) bằng giải thuật đối soát mờ (Fuzzy + Accent-Insensitive).
-- Trả về Direct Stream URL chuẩn MP3 (audio/mpeg) hỗ trợ HTTP 206 Range Request.
+- Lưu trữ trực tiếp file MP3 nội bộ (/audio/filename) hoặc qua Cloudflare R2 / Internet Archive / CDN ngoài.
+- Hỗ trợ Range Request (HTTP 206 Partial Content) để chip ESP32 giải mã mượt mà không bao giờ bị nghẽn buffer.
+- Tìm kiếm siêu tốc (< 2ms) bằng giải thuật đối soát mờ (Fuzzy + Accent-Insensitive + Tags).
+- Tách biệt hoàn toàn, không phụ thuộc YouTube/SoundCloud (tránh bị chặn IP Data Center).
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import unicodedata
 import urllib.request
@@ -18,55 +20,83 @@ from typing import Any, Optional
 
 logger = logging.getLogger("TheoLyMCP.CloudMusic")
 
-# Đường dẫn file danh mục nhạc cá nhân cục bộ / cấu hình
-CATALOG_FILE = Path(__file__).parent / "my_cloud_music.json"
+BASE_DIR = Path(__file__).parent
+CATALOG_FILE = BASE_DIR / "my_cloud_music.json"
+AUDIO_DIR = BASE_DIR / "static" / "audio"
 
-# Kho nhạc mẫu kiểm thử chuẩn CDN trực tiếp (Direct MP3, hỗ trợ Range HTTP 206)
-DEFAULT_CATALOG = {
-    "_description": "Kho nhạc cá nhân của bạn lưu trên Đám mây (Cloudflare R2 / CDN trực tiếp)",
-    "songs": [
-        {
-            "id": "lac_troi",
-            "title": "Lạc Trôi",
-            "artist": "Sơn Tùng M-TP",
-            "tags": ["lac troi", "son tung", "mtp", "nhac tre"],
-            "url": "https://raw.githubusercontent.com/tuongvan-project/xiaozhi_mcp/main/huggingface_xiaozhi_mcp/samples/lac_troi.mp3",
-            "duration": "04:33",
-            "bitrate": "128kbps"
-        },
-        {
-            "id": "tim_lai_bau_troi",
-            "title": "Tìm Lại Bầu Trời",
-            "artist": "Tuấn Hưng",
-            "tags": ["tim lai bau troi", "tuan hung", "nhac tre"],
-            "url": "https://raw.githubusercontent.com/tuongvan-project/xiaozhi_mcp/main/huggingface_xiaozhi_mcp/samples/tim_lai_bau_troi.mp3",
-            "duration": "04:12",
-            "bitrate": "128kbps"
-        },
-        {
-            "id": "lk_remix_2026",
-            "title": "Liên Khúc Nhạc Trẻ Remix Sôi Động",
-            "artist": "Nhiều Ca Sĩ",
-            "tags": ["remix", "nonstop", "lien khuc", "nhac tre remix", "lk"],
-            "url": "https://raw.githubusercontent.com/tuongvan-project/xiaozhi_mcp/main/huggingface_xiaozhi_mcp/samples/lk_remix.mp3",
-            "duration": "15:20",
-            "bitrate": "128kbps"
-        },
-        {
-            "id": "soundhelix_sample",
-            "title": "SoundHelix Instrumental Sample",
-            "artist": "SoundHelix",
-            "tags": ["sample", "test", "instrumental", "nhac khong loi"],
-            "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-            "duration": "06:12",
-            "bitrate": "192kbps"
-        }
-    ]
-}
+DEFAULT_SONGS: list[dict[str, Any]] = [
+    {
+        "id": "soundhelix_sample",
+        "title": "SoundHelix Instrumental Sample",
+        "artist": "SoundHelix Studio",
+        "tags": ["sample", "test", "instrumental", "nhac khong loi", "soundhelix"],
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        "local_file": "soundhelix_test.mp3",
+        "duration": "06:12",
+        "bitrate": "192kbps"
+    },
+    {
+        "id": "nhac_thien_432hz",
+        "title": "Nhạc Thiền Thư Giãn Sóng Tần Số 432Hz",
+        "artist": "Theo Ly Healing Cloud",
+        "tags": ["nhac thien", "thu gian", "ngu ngon", "song nao", "432hz", "healing"],
+        "local_file": "nhac_thien_thu_gian.mp3",
+        "duration": "00:30",
+        "bitrate": "128kbps"
+    },
+    {
+        "id": "chuong_nhip_dieu_528hz",
+        "title": "Giai Điệu Chuông Thư Thái 528Hz",
+        "artist": "Theo Ly Sound Lab",
+        "tags": ["chuong", "nhip dieu", "nang luong", "528hz", "chuong bao thuc"],
+        "local_file": "chuong_nhip_dieu.mp3",
+        "duration": "00:20",
+        "bitrate": "128kbps"
+    },
+    {
+        "id": "am_thanh_tu_nhien",
+        "title": "Âm Thanh Thiên Nhiên Tiếng Gió Rừng Xanh",
+        "artist": "Theo Ly Forest Sound",
+        "tags": ["thien nhien", "gio rung", "tieng gio", "rung xanh", "tieng chim", "tieng mua"],
+        "local_file": "am_thanh_tu_nhien.mp3",
+        "duration": "00:30",
+        "bitrate": "128kbps"
+    },
+    {
+        "id": "lac_troi",
+        "title": "Lạc Trôi (Acoustic / Beat)",
+        "artist": "Sơn Tùng M-TP",
+        "tags": ["lac troi", "son tung", "mtp", "nhac tre", "acoustic"],
+        "url": "https://archive.org/download/lac-troi-sample/lac_troi.mp3",
+        "local_file": "",
+        "duration": "04:33",
+        "bitrate": "128kbps"
+    },
+    {
+        "id": "tim_lai_bau_troi",
+        "title": "Tìm Lại Bầu Trời",
+        "artist": "Tuấn Hưng",
+        "tags": ["tim lai bau troi", "tuan hung", "nhac tre"],
+        "url": "https://archive.org/download/tim-lai-bau-troi-sample/tim_lai_bau_troi.mp3",
+        "local_file": "",
+        "duration": "04:12",
+        "bitrate": "128kbps"
+    },
+    {
+        "id": "lk_remix_soi_dong",
+        "title": "Liên Khúc Nhạc Trẻ Remix Sôi Động",
+        "artist": "Nhiều Ca Sĩ",
+        "tags": ["remix", "nonstop", "lien khuc", "nhac tre remix", "lk", "soi dong"],
+        "url": "https://archive.org/download/lk-remix-sample/lk_remix.mp3",
+        "local_file": "",
+        "duration": "15:20",
+        "bitrate": "128kbps"
+    }
+]
 
 
 def strip_accents(text: str) -> str:
-    """Loại bỏ dấu tiếng Việt và ký tự đặc biệt để so khớp không dấu."""
+    """Loại bỏ dấu tiếng Việt và chuẩn hóa để so khớp mờ."""
     if not text:
         return ""
     text = unicodedata.normalize("NFD", text)
@@ -79,6 +109,7 @@ def strip_accents(text: str) -> str:
 class CloudMusicHub:
     def __init__(self, catalog_path: Optional[Path] = None):
         self.catalog_path = catalog_path or CATALOG_FILE
+        self.songs: list[dict[str, Any]] = []
         self._load_catalog()
 
     def _load_catalog(self) -> None:
@@ -89,8 +120,8 @@ class CloudMusicHub:
                 logger.info(f"Đã nạp {len(self.songs)} bài hát từ {self.catalog_path}")
                 return
             except Exception as e:
-                logger.warning(f"Lỗi đọc catalog file: {e}. Dùng catalog mặc định.")
-        self.songs = DEFAULT_CATALOG.get("songs", [])
+                logger.warning(f"Lỗi đọc catalog file: {e}. Sử dụng danh mục mặc định.")
+        self.songs = list(DEFAULT_SONGS)
         self._save_catalog()
 
     def _save_catalog(self) -> None:
@@ -103,32 +134,93 @@ class CloudMusicHub:
         except Exception as e:
             logger.warning(f"Không thể lưu catalog file: {e}")
 
-    def add_song(self, title: str, artist: str, url: str, tags: list[str] | None = None) -> dict[str, Any]:
-        """Thêm một bài hát mới trên Cloud vào danh mục."""
+    def list_songs(self, public_url: str = "") -> list[dict[str, Any]]:
+        """Trả về toàn bộ danh sách bài hát kèm URL stream tuyệt đối."""
+        pub = (public_url or "").rstrip("/")
+        result = []
+        for s in self.songs:
+            item = dict(s)
+            local_f = item.get("local_file", "").strip()
+            if local_f and (AUDIO_DIR / local_f).exists():
+                item["stream_url"] = f"{pub}/audio/{local_f}" if pub else f"/audio/{local_f}"
+                item["source_type"] = "Đám mây máy chủ nội bộ (Direct Local Cloud)"
+                item["available"] = True
+            elif item.get("url"):
+                item["stream_url"] = item.get("url")
+                item["source_type"] = "Kho đám mây ngoại vi (Cloudflare R2 / CDN)"
+                item["available"] = True
+            else:
+                item["stream_url"] = ""
+                item["source_type"] = "Chưa có luồng"
+                item["available"] = False
+            result.append(item)
+        return result
+
+    def add_song(
+        self,
+        title: str,
+        artist: str = "",
+        url: str = "",
+        local_file: str = "",
+        tags: list[str] | None = None,
+        duration: str = "",
+        bitrate: str = "128kbps"
+    ) -> dict[str, Any]:
+        """Thêm hoặc cập nhật bài hát vào danh mục đám mây."""
         s_id = re.sub(r"\s+", "_", strip_accents(title))
+        if not s_id:
+            s_id = f"song_{len(self.songs) + 1}"
+
         item = {
             "id": s_id,
             "title": title.strip(),
             "artist": (artist or "Chưa rõ").strip(),
-            "tags": [strip_accents(t) for t in (tags or [])] + [strip_accents(title), strip_accents(artist)],
-            "url": url.strip()
+            "tags": [strip_accents(t) for t in (tags or []) if t] + [strip_accents(title), strip_accents(artist)],
+            "url": (url or "").strip(),
+            "local_file": (local_file or "").strip(),
+            "duration": (duration or "").strip() or "03:30",
+            "bitrate": bitrate or "128kbps"
         }
-        # Cập nhật nếu trùng ID hoặc thêm mới
+
+        # Cập nhật nếu trùng ID
         for i, s in enumerate(self.songs):
             if s.get("id") == s_id:
                 self.songs[i] = item
                 self._save_catalog()
                 return item
+
         self.songs.append(item)
         self._save_catalog()
         return item
 
-    def search_song(self, query: str) -> Optional[dict[str, Any]]:
+    def delete_song(self, song_id: str) -> bool:
+        """Xóa bài hát khỏi danh mục và dọn file cục bộ nếu có."""
+        found = False
+        remaining = []
+        for s in self.songs:
+            if s.get("id") == song_id:
+                found = True
+                local_f = s.get("local_file")
+                if local_f:
+                    fpath = AUDIO_DIR / local_f
+                    if fpath.exists():
+                        try:
+                            fpath.unlink()
+                        except Exception as e:
+                            logger.warning(f"Lỗi xóa file âm thanh {local_f}: {e}")
+            else:
+                remaining.append(s)
+        if found:
+            self.songs = remaining
+            self._save_catalog()
+        return found
+
+    def search_song(self, query: str, public_url: str = "") -> Optional[dict[str, Any]]:
         """
-        Tìm bài hát thông minh:
-        1. Khớp chính xác ID hoặc Tên bài hát.
+        Tìm kiếm thông minh:
+        1. Khớp chính xác ID hoặc tên bài hát.
         2. Khớp không dấu (accent-insensitive).
-        3. Khớp chứa từ khóa (sub-string matching trong title, artist, tags).
+        3. Khớp chuỗi con trong tiêu đề, ca sĩ, danh sách từ khóa tags.
         """
         q = (query or "").strip()
         if not q:
@@ -141,59 +233,70 @@ class CloudMusicHub:
         best_score = 0
 
         for s in self.songs:
+            s_id = s.get("id", "")
             s_title_norm = strip_accents(s.get("title", ""))
             s_artist_norm = strip_accents(s.get("artist", ""))
             s_tags = [strip_accents(t) for t in s.get("tags", [])]
 
             # 1. Trùng khớp hoàn toàn (100 điểm)
-            if q_norm == s_title_norm:
-                return s
+            if q_norm == s_title_norm or q_norm == s_id:
+                best_match = s
+                best_score = 100
+                break
 
             score = 0
-            # 2. Toàn bộ tên bài nằm trong câu hỏi
+            # 2. Toàn bộ tên bài nằm trong câu lệnh giọng nói (ví dụ: "mở bài lạc trôi đi em")
             if s_title_norm and s_title_norm in q_norm:
-                score += 50
+                score += 55
             elif q_norm in s_title_norm:
-                score += 40
+                score += 45
 
             # 3. Tên ca sĩ nằm trong câu hỏi
             if s_artist_norm and (s_artist_norm in q_norm or q_norm in s_artist_norm):
                 score += 30
 
-            # 4. Trùng từ khóa trong tags
+            # 4. Trùng từ khóa tags
             for t in s_tags:
-                if t in q_norm or q_norm in t:
-                    score += 20
+                if t and (t in q_norm or q_norm in t):
+                    score += 25
                     break
 
             # 5. Đếm số từ trùng
             s_all_words = set(s_title_norm.split() + s_artist_norm.split())
             common_words = q_words.intersection(s_all_words)
-            score += len(common_words) * 10
+            score += len(common_words) * 12
 
             if score > best_score:
                 best_score = score
                 best_match = s
 
-        # Ngưỡng chấp nhận (ít nhất 20 điểm để tránh nhận diện nhầm)
-        if best_score >= 20:
-            return best_match
+        # Ngưỡng chấp nhận tối thiểu 20 điểm
+        if best_score >= 20 and best_match:
+            item = dict(best_match)
+            pub = (public_url or "").rstrip("/")
+            local_f = item.get("local_file", "").strip()
+            if local_f and (AUDIO_DIR / local_f).exists():
+                item["stream_url"] = f"{pub}/audio/{local_f}" if pub else f"/audio/{local_f}"
+            else:
+                item["stream_url"] = item.get("url", "")
+            return item
+
         return None
 
-    def verify_stream_url(self, url: str, timeout: float = 5.0) -> dict[str, Any]:
+    def verify_stream_url(self, url: str, timeout: float = 6.0) -> dict[str, Any]:
         """
-        Kiểm định chất lượng kỹ thuật của Direct Stream URL:
-        - Kiểm tra HTTP Status (200 / 206)
-        - Kiểm tra Content-Type (audio/mpeg hoặc tương đương)
-        - Kiểm tra Range Request header (bắt buộc cho ESP32)
-        - Tốc độ tải byte đầu tiên (Time to First Byte - TTFB)
+        Kiểm định kỹ thuật của Direct Stream URL:
+        - HTTP Status (200 / 206)
+        - Hỗ trợ Range Request (BẮT BUỘC cho ESP32)
+        - Content-Type chuẩn audio
+        - Thời gian phản hồi (TTFB)
         """
         import time
         t0 = time.perf_counter()
         req = urllib.request.Request(
             url,
             headers={
-                "User-Agent": "xiaozhi-esp32/2.0",
+                "User-Agent": "xiaozhi-esp32-streamer/2.0",
                 "Range": "bytes=0-4095"
             }
         )

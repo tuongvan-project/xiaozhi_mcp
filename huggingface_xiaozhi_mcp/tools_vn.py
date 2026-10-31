@@ -1039,36 +1039,34 @@ def tool_vn_music_and_culture(
         or "https://xiaozhi-mcp.onrender.com"
     ).rstrip("/")
 
+    encoded_hint = urllib.parse.quote(hint)
+
     if results:
         top = results[0]
         vid = top["id"]
         title = _clean_for_speech(top["title"], 100)
         dur = top.get("duration", "")
-        stream_url = f"{public_url}/stream?v={vid}"
+        stream_url = f"{public_url}/stream?q={encoded_hint}&v={vid}"
         cover_url = top.get("thumbnail", f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg")
         dur_info = f" (Thời lượng: {dur})" if dur else ""
 
         return (
             f"Tìm thấy bài hát: {title}{dur_info}. "
-            f"Đường dẫn âm thanh trực tiếp: {stream_url}. "
-            f"Ảnh bìa YouTube: {cover_url}. "
+            f"Đường dẫn âm thanh trực tiếp 24/7: {stream_url}. "
+            f"Ảnh bìa: {cover_url}. "
             f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay lập tức công cụ "
             f"self.music.play(query='{stream_url}', title='{title}') "
             f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức)."
         )
 
-    # 4. Dự phòng: Tìm lời bài hát hoặc gợi ý gọi công cụ nội bộ
-    web_hits = _fetch_ddg_web_vn(f"bài hát {hint} lời bài hát ca sĩ", max_items=2)
-    combined = " | ".join(web_hits)
-    if combined:
-        return (
-            f"Gợi ý bài hát cho '{hint}': {_clean_for_speech(combined, 300)}. "
-            f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay self.music.play(query='{hint}') để thiết bị tự tìm và phát nhạc)."
-        )
-
+    # 4. Dự phòng: Phát từ Kho nhạc số thời gian thực không bao giờ chặn
+    stream_url = f"{public_url}/stream?q={encoded_hint}"
     return (
-        f"Đang tìm bài hát '{hint}'. "
-        f"(Hướng dẫn Theo Ly: Hãy gọi ngay self.music.play(query='{hint}') để thiết bị phát bài hát này)."
+        f"Đang phát bài hát: '{hint}' từ kho nhạc số 24/7. "
+        f"Đường dẫn âm thanh trực tiếp: {stream_url}. "
+        f"(Hướng dẫn Theo Ly: Hãy gọi ngay lập tức công cụ "
+        f"self.music.play(query='{stream_url}', title='{hint}') "
+        f"để thiết bị phát bài hát này ngay lập tức)."
     )
 
 

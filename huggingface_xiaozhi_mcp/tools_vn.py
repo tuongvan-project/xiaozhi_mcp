@@ -1028,7 +1028,7 @@ def tool_vn_music_and_culture(
         or "https://xiaozhi-mcp.onrender.com"
     ).rstrip("/")
 
-    # 2. ƯU TIÊN TUYỆT ĐỐI: KHO NHẠC & AUDIO ĐÁM MÂY CÁ NHÂN (Cloudflare R2 / Direct MP3 Stream - 0ms, không chặn bot)
+    # 2. ƯU TIÊN TUYỆT ĐỐI: KHO NHẠC & AUDIO ĐÁM MÂY CÁ NHÂN (Direct MP3 Stream - 0ms)
     try:
         from cloud_music_hub import CloudMusicHub
         hub = CloudMusicHub()
@@ -1039,9 +1039,9 @@ def tool_vn_music_and_culture(
             c_url = cloud_song.get("stream_url") or cloud_song.get("url", "")
             logger.info(f"Phát hiện bài hát '{c_title}' trong kho cá nhân: {c_url}")
             return (
-                f"Tìm thấy bài hát trên Đám mây: {c_title} - {c_artist}. "
-                f"Đường dẫn âm thanh trực tiếp: {c_url}. "
-                f"LỆNH BẮT BUỘC CHO TRỢ LÝ: Hãy gọi ngay lập tức lệnh self.music.play(query=\"{c_url}\", title=\"{c_title}\") "
+                f"Đang phát nhạc: {c_title} - {c_artist}. "
+                f"(Lệnh phát: self.music.play(query='{c_url}', title='{c_title}'))"
+            ) "
                 f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức. "
                 f"TUYỆT ĐỐI CẤM dùng self.music.action và CẤM gọi search.music vì thiết bị chỉ hỗ trợ self.music.play."
             )
@@ -1261,7 +1261,7 @@ MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
         "description": (
             "CÔNG CỤ PHÁT NHẠC VÀ AUDIO ĐÁM MÂY CÁ NHÂN VIỆT NAM (Cloud Audio Hub). "
             "BẮT BUỘC gọi công cụ này BẤT CỨ KHI NÀO người dùng yêu cầu: mở bài hát, nghe nhạc, phát nhạc, bật bài, "
-            "tìm bài hát theo ca sĩ, nhạc trẻ, remix, nhạc thiền 432Hz, chuông 528Hz, tiếng gió rừng, nhạc Cloudflare, "
+            "tìm bài hát theo ca sĩ, nhạc trẻ, remix, nhạc thiền 432Hz, chuông 528Hz, tiếng gió rừng, "
             "hoặc đài Radio VOV (ví dụ: 'Mở bài Lạc Trôi', 'Bật nhạc thiền', 'Nghe giai điệu chuông', 'Mở bài Tìm lại bầu trời', 'Mở nhạc'). "
             "Công cụ này trả về luồng MP3 trực tiếp từ Kho Nhạc Đám Mây để thiết bị phát ngay lập tức."
         ),
@@ -1270,7 +1270,7 @@ MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
             "properties": {
                 "song_query": {
                     "type": "string",
-                    "description": "Tên bài hát, ca sĩ, giai điệu hoặc yêu cầu âm nhạc (ví dụ: 'Lạc Trôi', 'Nhạc thiền 432Hz', 'Giai điệu chuông', 'Cloudflare', 'VOV1').",
+                    "description": "Tên bài hát, ca sĩ, giai điệu hoặc yêu cầu âm nhạc (ví dụ: 'Lạc Trôi', 'Nhạc thiền 432Hz', 'Giai điệu chuông', 'VOV1').",
                 },
                 "is_playlist": {
                     "type": "boolean",

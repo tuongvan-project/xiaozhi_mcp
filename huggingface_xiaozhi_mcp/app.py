@@ -290,6 +290,9 @@ async def serve_audio_file(file_name: str, request: Request):
 
     file_size = file_path.stat().st_size
     range_header = request.headers.get("Range")
+    ua = request.headers.get("user-agent", "Unknown")
+    client_ip = request.client.host if request.client else "unknown"
+    _add_log(f"AUDIO STREAM: '{safe_name}' ({file_size}B) cho {client_ip} | UA: {ua} | Range: {range_header}")
 
     if range_header:
         range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
@@ -396,7 +399,7 @@ async def api_add_music_url(
     tags: str = Form(""),
     duration: str = Form(""),
 ):
-    """Thêm liên kết âm thanh đám mây (Cloudflare R2, Internet Archive, Direct CDN)."""
+    """Thêm liên kết âm thanh đám mây (Đám Mây Nội Bộ hoặc Direct MP3)."""
     clean_url = url.strip()
     if not clean_url.startswith("http"):
         raise HTTPException(status_code=400, detail="URL không hợp lệ")
@@ -609,7 +612,7 @@ async def dashboard_ui():
         source_badge = (
             '<span style="background:#0284c7;color:#fff;padding:2px 8px;border-radius:6px;font-size:12px;">Đám mây Nội bộ (Direct MP3)</span>'
             if s.get("local_file")
-            else '<span style="background:#6366f1;color:#fff;padding:2px 8px;border-radius:6px;font-size:12px;">Cloudflare R2 / CDN</span>'
+            else '<span style="background:#6366f1;color:#fff;padding:2px 8px;border-radius:6px;font-size:12px;">Kho Đám Mây Trực Tiếp</span>'
         )
         audio_player = (
             f'<audio controls preload="none" style="height:32px;width:220px;" src="{s_url}"></audio>'
@@ -712,14 +715,14 @@ async def dashboard_ui():
 
       <!-- Form 2: Thêm URL ngoài -->
       <div class="form-box">
-        <h3 style="margin-top:0;font-size:15px;color:#38bdf8;">🌐 2. Thêm Liên Kết Đám Mây Ngoài (Cloudflare R2 / CDN / Internet Archive)</h3>
+        <h3 style="margin-top:0;font-size:15px;color:#38bdf8;">🌐 2. Thêm Liên Kết Đám Mây Ngoài (Kho Đám Mây Trực Tiếp / Internet Archive)</h3>
         <form id="urlForm" onsubmit="handleAddUrl(event)">
           <label>Tên bài hát (*):</label>
           <input type="text" id="urlTitle" required placeholder="Ví dụ: Tìm Lại Bầu Trời">
           <label>Ca sĩ / Nghệ sĩ:</label>
           <input type="text" id="urlArtist" placeholder="Ví dụ: Tuấn Hưng">
           <label>Đường dẫn MP3 trực tiếp (Direct Audio URL):</label>
-          <input type="text" id="urlInput" required placeholder="https://pub-xxxx.r2.dev/song.mp3 hoặc Internet Archive">
+          <input type="text" id="urlInput" required placeholder="https://domain.com/baihat.mp3">
           <label>Từ khóa gợi ý (Tags):</label>
           <input type="text" id="urlTags" placeholder="tim lai bau troi, tuan hung">
           <button type="button" class="btn" onclick="verifyUrl()" style="background:#475569;margin-right:8px;">🔍 Kiểm Tra Kỹ Thuật (ESP32 Ready)</button>

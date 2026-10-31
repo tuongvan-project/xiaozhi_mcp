@@ -1,7 +1,7 @@
 """
 Module Quản lý & Điều hướng Kho Nhạc Cá Nhân trên Đám mây (Cloud Music Hub).
 Thiết kế tối ưu cho Xiaozhi & ESP32-S3:
-- Lưu trữ trực tiếp file MP3 nội bộ (/audio/filename) hoặc qua Cloudflare R2 / Internet Archive / CDN ngoài.
+- Lưu trữ trực tiếp file MP3 nội bộ (/audio/filename) hoặc qua Kho Âm thanh Đám mây Trực tiếp / Direct MP3.
 - Hỗ trợ Range Request (HTTP 206 Partial Content) để chip ESP32 giải mã mượt mà không bao giờ bị nghẽn buffer.
 - Tìm kiếm siêu tốc (< 2ms) bằng giải thuật đối soát mờ (Fuzzy + Accent-Insensitive + Tags).
 - Tách biệt hoàn toàn, không phụ thuộc YouTube/SoundCloud (tránh bị chặn IP Data Center).
@@ -64,11 +64,11 @@ DEFAULT_SONGS: list[dict[str, Any]] = [
     },
     {
         "id": "lac_troi",
-        "title": "Lạc Trôi (Acoustic / Beat)",
+        "title": "Lạc Trôi",
         "artist": "Sơn Tùng M-TP",
         "tags": ["lac troi", "son tung", "mtp", "nhac tre", "acoustic"],
-        "url": "https://archive.org/download/lac-troi-sample/lac_troi.mp3",
-        "local_file": "",
+        "url": "",
+        "local_file": "lac_troi.mp3",
         "duration": "04:33",
         "bitrate": "128kbps"
     },
@@ -77,8 +77,8 @@ DEFAULT_SONGS: list[dict[str, Any]] = [
         "title": "Tìm Lại Bầu Trời",
         "artist": "Tuấn Hưng",
         "tags": ["tim lai bau troi", "tuan hung", "nhac tre"],
-        "url": "https://archive.org/download/tim-lai-bau-troi-sample/tim_lai_bau_troi.mp3",
-        "local_file": "",
+        "url": "",
+        "local_file": "tim_lai_bau_troi.mp3",
         "duration": "04:12",
         "bitrate": "128kbps"
     },
@@ -87,8 +87,8 @@ DEFAULT_SONGS: list[dict[str, Any]] = [
         "title": "Liên Khúc Nhạc Trẻ Remix Sôi Động",
         "artist": "Nhiều Ca Sĩ",
         "tags": ["remix", "nonstop", "lien khuc", "nhac tre remix", "lk", "soi dong"],
-        "url": "https://archive.org/download/lk-remix-sample/lk_remix.mp3",
-        "local_file": "",
+        "url": "",
+        "local_file": "lk_remix.mp3",
         "duration": "15:20",
         "bitrate": "128kbps"
     }

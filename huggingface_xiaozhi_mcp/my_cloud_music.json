@@ -11,7 +11,6 @@
         "nhac khong loi",
         "soundhelix"
       ],
-      "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
       "local_file": "soundhelix_test.mp3",
       "duration": "06:12",
       "bitrate": "192kbps"
@@ -44,7 +43,7 @@
         "chuong bao thuc"
       ],
       "local_file": "chuong_nhip_dieu.mp3",
-      "duration": "00:20",
+      "duration": "00:25",
       "bitrate": "128kbps"
     },
     {
@@ -65,7 +64,7 @@
     },
     {
       "id": "lac_troi",
-      "title": "Lạc Trôi (Acoustic / Beat)",
+      "title": "Lạc Trôi",
       "artist": "Sơn Tùng M-TP",
       "tags": [
         "lac troi",
@@ -74,8 +73,7 @@
         "nhac tre",
         "acoustic"
       ],
-      "url": "https://archive.org/download/lac-troi-sample/lac_troi.mp3",
-      "local_file": "",
+      "local_file": "lac_troi.mp3",
       "duration": "04:33",
       "bitrate": "128kbps"
     },
@@ -88,8 +86,7 @@
         "tuan hung",
         "nhac tre"
       ],
-      "url": "https://archive.org/download/tim-lai-bau-troi-sample/tim_lai_bau_troi.mp3",
-      "local_file": "",
+      "local_file": "tim_lai_bau_troi.mp3",
       "duration": "04:12",
       "bitrate": "128kbps"
     },
@@ -105,8 +102,7 @@
         "lk",
         "soi dong"
       ],
-      "url": "https://archive.org/download/lk-remix-sample/lk_remix.mp3",
-      "local_file": "",
+      "local_file": "lk_remix.mp3",
       "duration": "15:20",
       "bitrate": "128kbps"
     }

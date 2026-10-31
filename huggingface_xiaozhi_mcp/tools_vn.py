@@ -1022,7 +1022,29 @@ def tool_vn_music_and_culture(
                 f"hoặc self.radio.play(channel='{r_key}') và không nói thêm lời thừa để phát ngay lập tức)."
             )
 
-    # 2. Xử lý yêu cầu Playlist / Tuyển tập / Liên khúc / Remix
+    # 2. ƯU TIÊN SỐ 1: TRA CỨU KHO NHẠC ĐÁM MÂY CÁ NHÂN (Cloudflare R2 / Direct CDN - 0ms, không chặn bot)
+    try:
+        from cloud_music_hub import CloudMusicHub
+        hub = CloudMusicHub()
+        cloud_song = hub.search_song(hint)
+        if cloud_song:
+            c_title = cloud_song.get("title", hint)
+            c_artist = cloud_song.get("artist", "")
+            c_url = cloud_song.get("url", "")
+            c_dur = cloud_song.get("duration", "")
+            dur_info = f" (Thời lượng: {c_dur})" if c_dur else ""
+            logger.info(f"Phát hiện bài hát '{c_title}' trong kho cá nhân: {c_url}")
+            return (
+                f"Tìm thấy bài hát trong kho nhạc đám mây cá nhân: {c_title} - {c_artist}{dur_info}. "
+                f"Đường dẫn âm thanh trực tiếp: {c_url}. "
+                f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay lập tức công cụ "
+                f"self.music.play(query='{c_url}', title='{c_title}') "
+                f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức)."
+            )
+    except Exception as e_hub:
+        logger.debug(f"Cloud music hub lookup: {e_hub}")
+
+    # 3. Xử lý yêu cầu Playlist / Tuyển tập / Liên khúc / Remix
     is_pl = is_playlist or any(k in h_lower for k in [
         "playlist", "tuyển tập", "tuyen tap", "liên khúc", "lien khuc", "lk ",
         "album", "remix", "nonstop", "nhạc dài", "nghe liên tục"

@@ -1028,7 +1028,7 @@ def tool_vn_music_and_culture(
         or "https://xiaozhi-mcp.onrender.com"
     ).rstrip("/")
 
-    # 2. ƯU TIÊN TUYỆT ĐỐI SỐ 1: KHO NHẠC & AUDIO ĐÁM MÂY CÁ NHÂN (Cloudflare R2 / Server MP3 Direct - 0ms, không chặn bot)
+    # 2. ƯU TIÊN TUYỆT ĐỐI: KHO NHẠC & AUDIO ĐÁM MÂY CÁ NHÂN (Cloudflare R2 / Direct MP3 Stream - 0ms, không chặn bot)
     try:
         from cloud_music_hub import CloudMusicHub
         hub = CloudMusicHub()
@@ -1037,83 +1037,40 @@ def tool_vn_music_and_culture(
             c_title = cloud_song.get("title", hint)
             c_artist = cloud_song.get("artist", "")
             c_url = cloud_song.get("stream_url") or cloud_song.get("url", "")
-            c_dur = cloud_song.get("duration", "")
-            dur_info = f" (Thời lượng: {c_dur})" if c_dur else ""
             logger.info(f"Phát hiện bài hát '{c_title}' trong kho cá nhân: {c_url}")
             return (
-                f"Tìm thấy bài hát trong kho nhạc đám mây cá nhân: {c_title} - {c_artist}{dur_info}. "
+                f"Tìm thấy bài hát trên Đám mây: {c_title} - {c_artist}. "
                 f"Đường dẫn âm thanh trực tiếp: {c_url}. "
-                f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay lập tức công cụ "
-                f"self.music.play(query='{c_url}', title='{c_title}') "
-                f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức)."
+                f"LỆNH BẮT BUỘC CHO TRỢ LÝ: Hãy gọi ngay lập tức lệnh self.music.play(query=\"{c_url}\", title=\"{c_title}\") "
+                f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức. "
+                f"TUYỆT ĐỐI CẤM dùng self.music.action và CẤM gọi search.music vì thiết bị chỉ hỗ trợ self.music.play."
             )
     except Exception as e_hub:
         logger.warning(f"Cloud music hub lookup error: {e_hub}")
 
-    # 3. NẾU CHƯA CÓ TRONG KHO: ĐỀ XUẤT PHÁT BÀI CÓ SẴN TRONG KHO ĐÁM MÂY HOẶC RADIO ĐỂ TRÁNH CÂM TIẾNG (0 BYTES)
+    # 3. NẾU CHƯA CÓ BÀI HÁT TRONG KHO: PHÁT BÀI CÓ SẴN TRÊN ĐÁM MÂY (TRÁNH CÂM LOA HOẶC LỖI TÌM KIẾM HỆ THỐNG)
     try:
         all_songs = hub.list_songs(public_url=public_url)
         available = [s for s in all_songs if s.get("stream_url")]
         if available:
-            # Chọn bài ngẫu nhiên hoặc bài đầu tiên
             fallback_song = available[0]
-            fb_title = fallback_song.get("title", "Giai Điệu Thư Thái")
+            fb_title = fallback_song.get("title", "Giai Điệu Thư Thái Đám Mây")
             fb_url = fallback_song.get("stream_url", "")
             return (
-                f"Bài hát '{hint}' chưa có trong kho nhạc cá nhân. Đang mở bài hát có sẵn trên đám mây: {fb_title}. "
+                f"Chưa có bài hát '{hint}' trong kho cá nhân. Đang mở bài hát có sẵn trên Đám mây: {fb_title}. "
                 f"Đường dẫn âm thanh trực tiếp: {fb_url}. "
-                f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay lập tức công cụ "
-                f"self.music.play(query='{fb_url}', title='{fb_title}') "
-                f"và nhắc ngắn gọn người dùng có thể tải thêm nhạc lên kho đám mây tại web Theo Ly)."
+                f"LỆNH BẮT BUỘC CHO TRỢ LÝ: Hãy gọi ngay lập tức lệnh self.music.play(query=\"{fb_url}\", title=\"{fb_title}\") "
+                f"và KHÔNG nói lời thừa để thiết bị phát nhạc ngay lập tức. "
+                f"TUYỆT ĐỐI CẤM dùng self.music.action và CẤM gọi search.music."
             )
     except Exception as e_fb:
         logger.warning(f"Fallback song error: {e_fb}")
 
-    # 3. Xử lý yêu cầu Playlist / Tuyển tập / Liên khúc / Remix
-    is_pl = is_playlist or any(k in h_lower for k in [
-        "playlist", "tuyển tập", "tuyen tap", "liên khúc", "lien khuc", "lk ",
-        "album", "remix", "nonstop", "nhạc dài", "nghe liên tục"
-    ])
-
-    search_q = f"{hint} tuyển tập liên khúc playlist hay nhất" if is_pl else hint
-
-    # 3. Tìm kiếm bài hát trên YouTube (< 1.2s)
-    results = search_youtube_fast(search_q, max_results=3)
-
-    public_url = (
-        os.environ.get("RENDER_EXTERNAL_URL", "").strip()
-        or os.environ.get("PUBLIC_KEEPALIVE_URL", "").strip()
-        or "https://xiaozhi-mcp.onrender.com"
-    ).rstrip("/")
-
-    encoded_hint = urllib.parse.quote(hint)
-
-    if results:
-        top = results[0]
-        vid = top["id"]
-        title = _clean_for_speech(top["title"], 100)
-        dur = top.get("duration", "")
-        stream_url = f"{public_url}/stream?q={encoded_hint}&v={vid}"
-        cover_url = top.get("thumbnail", f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg")
-        dur_info = f" (Thời lượng: {dur})" if dur else ""
-
-        return (
-            f"Tìm thấy bài hát: {title}{dur_info}. "
-            f"Đường dẫn âm thanh trực tiếp 24/7: {stream_url}. "
-            f"Ảnh bìa: {cover_url}. "
-            f"(Hướng dẫn Theo Ly: Bạn hãy gọi ngay lập tức công cụ "
-            f"self.music.play(query='{stream_url}', title='{title}') "
-            f"và KHÔNG nói bất kỳ lời nào thừa trước hoặc sau khi gọi để thiết bị phát nhạc ngay lập tức)."
-        )
-
-    # 4. Dự phòng: Phát từ Kho nhạc số thời gian thực không bao giờ chặn
-    stream_url = f"{public_url}/stream?q={encoded_hint}"
+    default_test_url = f"{public_url}/audio/soundhelix_test.mp3"
     return (
-        f"Đang phát bài hát: '{hint}' từ kho nhạc số 24/7. "
-        f"Đường dẫn âm thanh trực tiếp: {stream_url}. "
-        f"(Hướng dẫn Theo Ly: Hãy gọi ngay lập tức công cụ "
-        f"self.music.play(query='{stream_url}', title='{hint}') "
-        f"để thiết bị phát bài hát này ngay lập tức)."
+        f"Đang phát giai điệu thư giãn từ Kho Đám Mây Theo Ly. "
+        f"Đường dẫn âm thanh trực tiếp: {default_test_url}. "
+        f"LỆNH BẮT BUỘC: Hãy gọi self.music.play(query=\"{default_test_url}\", title=\"Theo Ly Cloud Music\") ngay lập tức."
     )
 
 
